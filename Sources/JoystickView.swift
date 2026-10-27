@@ -31,7 +31,7 @@ struct JoystickView: View {
                         offset = CGSize(width: cos(angle) * maxDistance, height: sin(angle) * maxDistance)
                     }
                     
-                    // Invert Y because SceneKit uses negative Z for forward
+                    // Normalize vector (-1 to 1)
                     let normalizedX = Float(offset.width / maxDistance)
                     let normalizedY = Float(offset.height / maxDistance)
                     onMove(simd_float2(normalizedX, normalizedY))
