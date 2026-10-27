@@ -2,91 +2,148 @@ import SceneKit
 import simd
 
 class PlayerController: SCNNode {
-    var characterNode: SCNNode?
-    var isGrounded = false
     
-    // Dictionary to hold your animations
-    var animations: [String: CAAnimation] = [:]
+    // MARK: - Character Nodes
+    var characterRoot: SCNNode?
+    var torso: SCNNode?
+    var head: SCNNode?
+    var leftArm: SCNNode?
+    var rightArm: SCNNode?
+    var leftLeg: SCNNode?
+    var rightLeg: SCNNode?
+    
+    // MARK: - State
+    var isGrounded = false
+    private var currentAnimation: String = "Idle"
     
     override init() {
         super.init()
-        loadCustomCharacter()
+        loadCharacterFromUSDZ()
         setupPhysics()
     }
     
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     
-    func loadCustomCharacter() {
-        // 1. Load the USDZ file from the app bundle
-        guard let url = Bundle.main.url(forResource: "character", withExtension: "usdz") else {
-            print("ERROR: Could not find character.usdz in bundle.")
+    // MARK: - Loading the USDZ
+    private func loadCharacterFromUSDZ() {
+        // The file is in character_files/Roblox_R6_Rigged.usdz
+        guard let url = Bundle.main.url(forResource: "Roblox_R6_Rigged", withExtension: "usdz", subdirectory: "character_files") else {
+            print("ERROR: Could not find character_files/Roblox_R6_Rigged.usdz in bundle.")
             return
         }
         
         do {
             let scene = try SCNScene(url: url, options: nil)
+            guard let importedRoot = scene.rootNode.childNodes.first else { return }
             
-            // 2. Extract the root node of the character
-            guard let importedModel = scene.rootNode.childNodes.first else { return }
+            // Scale down if the model is too large (adjust as needed)
+            importedRoot.scale = SCNVector3(0.5, 0.5, 0.5)
             
-            // 3. Fix scale and positioning if necessary
-            // Roblox characters are usually around 5 studs tall. 
-            // If your model is huge, try changing scale to 0.1 or 0.01
-            importedModel.scale = SCNVector3(1.0, 1.0, 1.0) 
+            self.characterRoot = importedRoot
+            self.addChildNode(importedRoot)
             
-            self.characterNode = importedModel
-            self.addChildNode(importedModel)
+            // Find the R6 body parts
+            findR6Parts(in: importedRoot)
             
-            // 4. Extract animations from the USDZ
-            extractAnimations(from: importedModel)
+            // Setup pivots for limbs
+            setupLimbPivots()
             
-            // Start idle animation
-            playAnimation(name: "Idle")
+            // Start Idle
+            playIdle()
             
         } catch {
-            print("ERROR: Failed to load USDZ file: \(error)")
+            print("ERROR: Failed to load USDZ: \(error)")
         }
     }
     
-    func setupPhysics() {
-        // A basic collision box for the character
+    // MARK: - Locating R6 Limbs
+    private func findR6Parts(in node: SCNNode) {
+        // Recursively search for nodes with standard R6 names
+        node.enumerateChildNodes { (child, _) in
+            switch child.name?.lowercased() {
+            case "torso": self.torso = child
+            case "head": self.head = child
+            case "left arm", "leftarm": self.leftArm = child
+            case "right arm", "rightarm": self.rightArm = child
+            case "left leg", "leftleg": self.leftLeg = child
+            case "right leg", "rightleg": self.rightLeg = child
+            default: break
+            }
+        }
+        print("R6 Parts Found: Torso:\(torso != nil) Head:\(head != nil) LArm:\(leftArm != nil) RArm:\(rightArm != nil) LLeg:\(leftLeg != nil) RLeg:\(rightLeg != nil)")
+    }
+    
+    // MARK: - Pivots
+    private func setupLimbPivots() {
+        // Move pivot to the top of the limb so it swings like a shoulder/hip
+        let armPivot = SCNMatrix4MakeTranslation(0, 1, 0) // Adjust if necessary
+        leftArm?.pivot = armPivot
+        rightArm?.pivot = armPivot
+        
+        let legPivot = SCNMatrix4MakeTranslation(0, -1, 0) // Adjust if necessary
+        leftLeg?.pivot = legPivot
+        rightLeg?.pivot = legPivot
+    }
+    
+    // MARK: - Physics
+    private func setupPhysics() {
         let shape = SCNPhysicsShape(geometry: SCNBox(width: 2, height: 5, length: 2, chamferRadius: 0), options: nil)
         physicsBody = SCNPhysicsBody(type: .dynamic, shape: shape)
         physicsBody?.isAffectedByGravity = true
-        physicsBody?.angularVelocityFactor = SCNVector3(0, 0, 0) // Locks rotation so they don't fall over
-        physicsBody?.friction = 0.0 // Prevents getting stuck on baseplate edges
+        physicsBody?.angularVelocityFactor = SCNVector3(0, 0, 0)
+        physicsBody?.friction = 0.0
     }
     
-    func extractAnimations(from node: SCNNode) {
-        // Look for animation players inside the USDZ hierarchy
-        if let animationPlayer = node.animationPlayer(forKey: nil) {
-            for key in animationPlayer.animationKeys {
-                if let animation = animationPlayer.animation(forKey: key) {
-                    // Save the animation using the key (e.g., "Idle", "Walk")
-                    animations[key] = animation
-                }
-            }
-        }
+    // MARK: - Animations
+    private func playAnimation(name: String) {
+        guard currentAnimation != name else { return }
+        currentAnimation = name
         
-        // Recursively check children
-        for child in node.childNodes {
-            extractAnimations(from: child)
+        // Remove all actions from limbs
+        [leftArm, rightArm, leftLeg, rightLeg].forEach { $0?.removeAllActions() }
+        
+        switch name {
+        case "Walk": playWalk()
+        case "Jump": playJumpPose()
+        default: playIdle()
         }
     }
     
-    func playAnimation(name: String) {
-        // This looks for an animation with the name you exported from Blender
-        if let animation = animations[name] {
-            let player = SCNAnimationPlayer(animation: animation)
-            player.speed = 1.0
-            
-            // Add and play the animation on the character node
-            if let char = characterNode {
-                char.removeAllAnimations()
-                char.addAnimationPlayer(player, forKey: name)
-                player.play()
-            }
-        }
+    func playIdle() {
+        // Reset to neutral
+        let reset = SCNAction.rotateTo(x: 0, y: 0, z: 0, duration: 0.2)
+        [leftArm, rightArm, leftLeg, rightLeg].forEach { $0?.run(reset) }
+        
+        // Simple breathing on torso
+        let breatheUp = SCNAction.moveBy(x: 0, y: 0.05, z: 0, duration: 1.0)
+        let breatheDown = breatheUp.reversed()
+        let breathe = SCNAction.sequence([breatheUp, breatheDown])
+        torso?.run(SCNAction.repeatForever(breathe), forKey: "idle")
+    }
+    
+    private func playWalk() {
+        // Stop idle on torso
+        torso?.removeAction(forKey: "idle")
+        
+        let swingForward = SCNAction.rotateTo(x: 0.5, y: 0, z: 0, duration: 0.4)
+        let swingBack = SCNAction.rotateTo(x: -0.5, y: 0, z: 0, duration: 0.4)
+        let walkCycle = SCNAction.sequence([swingForward, swingBack])
+        
+        // Legs swing opposite
+        leftLeg?.run(SCNAction.repeatForever(walkCycle), forKey: "walk")
+        rightLeg?.run(SCNAction.repeatForever(walkCycle.reversed()), forKey: "walk")
+        
+        // Arms swing opposite to legs
+        leftArm?.run(SCNAction.repeatForever(walkCycle.reversed()), forKey: "walk")
+        rightArm?.run(SCNAction.repeatForever(walkCycle), forKey: "walk")
+    }
+    
+    private func playJumpPose() {
+        // Quick pose for jumping
+        leftArm?.run(SCNAction.rotateTo(x: 0, y: 0, z: -2.0, duration: 0.2))
+        rightArm?.run(SCNAction.rotateTo(x: 0, y: 0, z: 2.0, duration: 0.2))
+        leftLeg?.run(SCNAction.rotateTo(x: -0.5, y: 0, z: 0, duration: 0.2))
+        rightLeg?.run(SCNAction.rotateTo(x: -0.5, y: 0, z: 0, duration: 0.2))
     }
     
     // MARK: - Controls
@@ -94,7 +151,7 @@ class PlayerController: SCNNode {
         if isGrounded {
             physicsBody?.applyForce(SCNVector3(0, 15, 0), asImpulse: true)
             isGrounded = false
-            playAnimation(name: "Jump") // Plays jump animation if it exists
+            playAnimation(name: "Jump")
         }
     }
     
@@ -106,9 +163,9 @@ class PlayerController: SCNNode {
         physicsBody?.velocity = velocity
         
         if simd_length(direction) > 0.1 {
-            playAnimation(name: "Walk") // Plays walk animation if it exists
+            playAnimation(name: "Walk")
         } else {
-            playAnimation(name: "Idle") // Plays idle animation if it exists
+            playAnimation(name: "Idle")
         }
     }
     
