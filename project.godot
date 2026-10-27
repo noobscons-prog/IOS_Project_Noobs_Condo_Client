@@ -1,9 +1,16 @@
 config_version=5
 
 [application]
+
 config/name="IOS_CONDO_BLOX"
 run/main_scene="res://Main.tscn"
 config/features=PackedStringArray("4.4", "Mobile")
+
+[display]
+
+window/size/viewport_width=1334
+window/size/viewport_height=750
+window/handheld/orientation=0
 
 [input]
 
@@ -29,4 +36,6 @@ jump={
 }
 
 [rendering]
+
 renderer/rendering_method="mobile"
+textures/vram_compression/import_etc2_astc=true
