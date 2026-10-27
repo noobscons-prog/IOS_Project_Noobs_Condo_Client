@@ -11,103 +11,89 @@ class PlayerController: SCNNode {
     var leftLeg: SCNNode?
     var rightLeg: SCNNode?
     
+    // Store the bone log here so the UI can access it
+    var boneLogText: String = "No character loaded."
+    
     override init() {
         super.init()
-        setupFallbackBody() 
-        loadCharacterFromUSDZ() 
+        loadCharacter()
         setupPhysics()
     }
     
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     
-    func setupFallbackBody() {
-        let geo = SCNBox(width: 2, height: 5, length: 2, chamferRadius: 0)
-        let mat = SCNMaterial()
-        mat.diffuse.contents = UIColor.red
-        geo.materials = [mat]
-        let fallbackNode = SCNNode(geometry: geo)
-        // Since physics box center is 0,0,0, we center the visual box at 0,0,0
-        fallbackNode.position = SCNVector3(0, 0, 0)
-        self.addChildNode(fallbackNode)
-    }
-    
-    private func loadCharacterFromUSDZ() {
-        var url = Bundle.main.url(forResource: "Roblox_R6_Rigged", withExtension: "usdz")
+    private func loadCharacter() {
+        // 🚨 PRIORITIZE FBX 🚨
+        var url = Bundle.main.url(forResource: "Roblox_R6_Rigged", withExtension: "fbx")
         if url == nil {
-            url = Bundle.main.url(forResource: "Roblox_R6_Rigged", withExtension: "usdz", subdirectory: "character_files")
+            url = Bundle.main.url(forResource: "Roblox_R6_Rigged", withExtension: "usdz")
         }
         
         guard let finalUrl = url else {
-            print("ERROR: Could not find Roblox_R6_Rigged.usdz. Using fallback red box.")
+            boneLogText = "ERROR: Could not find .fbx or .usdz in bundle."
             return
         }
         
         do {
-            let scene = try SCNScene(url: finalUrl, options: nil)
-            guard let importedRoot = scene.rootNode.childNodes.first else { return }
+            // Use SCNSceneSource to load FBX properly
+            let source = SCNSceneSource(url: finalUrl, options: nil)
+            let scene = source?.scene(options: nil, error: nil)
             
-            // Scale down the character
-            importedRoot.scale = SCNVector3(0.05, 0.05, 0.05)
+            guard let rootNode = scene?.rootNode.childNodes.first else {
+                boneLogText = "ERROR: Failed to extract root node from file."
+                return
+            }
             
-            // 🚨 FIX COLLISION: Align feet to the bottom of the 5-unit physics box (-2.5)
-            let (min, _) = importedRoot.boundingBox
-            let bottomOffset = -min.y * 0.05 // Taking scale into account
-            importedRoot.position = SCNVector3(0, -2.5 + bottomOffset, 0)
+            // 🚨 HARDCODED SCALE 🚨
+            rootNode.scale = SCNVector3(0.1, 0.1, 0.1)
             
-            self.childNodes.forEach { $0.removeFromParentNode() }
+            // Align feet to the bottom of the physics box (-2.5)
+            let (min, _) = rootNode.boundingBox
+            let bottomOffset = -min.y * 0.1
+            rootNode.position = SCNVector3(0, -2.5 + bottomOffset, 0)
             
-            self.characterRoot = importedRoot
-            self.addChildNode(importedRoot)
+            self.characterRoot = rootNode
+            self.addChildNode(rootNode)
             
-            findR6Parts(in: importedRoot)
+            // Generate the log of all nodes
+            boneLogText = "Character Hierarchy:\n"
+            findR6PartsAndLog(in: rootNode)
+            
             setupLimbPivots()
             playIdle()
             
         } catch {
-            print("ERROR: Failed to load USDZ: \(error). Using fallback red box.")
+            boneLogText = "ERROR loading file: \(error)"
         }
     }
     
-    private func findR6Parts(in node: SCNNode) {
-        node.enumerateChildNodes { (child, _) in
-            guard let name = child.name?.lowercased() else { return }
+    private func findR6PartsAndLog(in node: SCNNode) {
+        var depth = 0
+        // Recursive function to print and find parts
+        func traverse(currentNode: SCNNode, currentDepth: Int) {
+            let indent = String(repeating: "  ", count: currentDepth)
+            if let name = currentNode.name {
+                boneLogText += "\(indent)- \(name)\n"
+                
+                // Match common naming conventions
+                let lower = name.lowercased()
+                if lower.contains("torso") || lower.contains("body") { self.torso = currentNode }
+                else if lower.contains("head") { self.head = currentNode }
+                else if (lower.contains("left") || lower.contains("l_")) && lower.contains("arm") { self.leftArm = currentNode }
+                else if (lower.contains("right") || lower.contains("r_")) && lower.contains("arm") { self.rightArm = currentNode }
+                else if (lower.contains("left") || lower.contains("l_")) && lower.contains("leg") { self.leftLeg = currentNode }
+                else if (lower.contains("right") || lower.contains("r_")) && lower.contains("leg") { self.rightLeg = currentNode }
+            }
             
-            // Matching common naming conventions (e.g., "LeftArm", "Left Arm", "left_arm")
-            if name.contains("torso") || name.contains("body") || name.contains("chest") {
-                self.torso = child
-            } else if name.contains("head") {
-                self.head = child
-            } else if (name.contains("left") || name.contains("l_")) && name.contains("arm") {
-                self.leftArm = child
-            } else if (name.contains("right") || name.contains("r_")) && name.contains("arm") {
-                self.rightArm = child
-            } else if (name.contains("left") || name.contains("l_")) && name.contains("leg") {
-                self.leftLeg = child
-            } else if (name.contains("right") || name.contains("r_")) && name.contains("leg") {
-                self.rightLeg = child
+            for child in currentNode.childNodes {
+                traverse(currentNode: child, currentDepth: currentDepth + 1)
             }
         }
-    }
-    
-    // 🚨 DEBUG: Function to get all bone names for the log UI
-    func logBoneNames() -> String {
-        guard let root = characterRoot else { return "No character loaded." }
-        var log = "Character Hierarchy:\n"
-        
-        func traverse(_ node: SCNNode, depth: Int) {
-            let indent = String(repeating: "  ", count: depth)
-            if let name = node.name {
-                log += "\(indent)- \(name)\n"
-            }
-            for child in node.childNodes {
-                traverse(child, depth: depth + 1)
-            }
-        }
-        traverse(root, depth: 0)
-        return log
+        traverse(currentNode: node, currentDepth: depth)
     }
     
     private func setupLimbPivots() {
+        // Pivot adjustments for the smaller scale
         let armPivot = SCNMatrix4MakeTranslation(0, 1, 0)
         leftArm?.pivot = armPivot
         rightArm?.pivot = armPivot
@@ -118,12 +104,13 @@ class PlayerController: SCNNode {
     }
     
     private func setupPhysics() {
+        // 5-unit tall physics box, centered at (0,0,0) of the player node
         let shape = SCNPhysicsShape(geometry: SCNBox(width: 2, height: 5, length: 2, chamferRadius: 0), options: nil)
         physicsBody = SCNPhysicsBody(type: .dynamic, shape: shape)
         physicsBody?.isAffectedByGravity = true
         physicsBody?.angularVelocityFactor = SCNVector3(0, 0, 0)
-        physicsBody?.friction = 0.0
-        physicsBody?.restitution = 0.0 // Prevents bouncing
+        physicsBody?.friction = 0.5 // Increased friction so we don't slide
+        physicsBody?.restitution = 0.0 
     }
     
     // MARK: - Animations
@@ -160,27 +147,26 @@ class PlayerController: SCNNode {
     
     // MARK: - Controls
     func checkGrounded() -> Bool {
-        // Since the box is 5 units tall and spawns at Y=2.5, if the player is near Y=2.5, they are on the ground.
+        // Ground top is at Y=0. Box center is Y=2.5. If center is below 3.0, we are grounded.
         if presentation.position.y <= 3.0 { return true }
         return false
     }
     
     func jump() {
         if checkGrounded() { 
-            // Direct velocity change is much more reliable than force
             physicsBody?.velocity.y = 15.0
             playJumpPose()
         }
     }
     
     func move(direction: SIMD2<Float>) {
-        // Only move horizontally, preserve gravity's vertical pull
         let speed: Float = 12.0
+        // Only change X and Z. Y is handled by gravity.
         physicsBody?.velocity.x = direction.x * speed
         physicsBody?.velocity.z = direction.y * speed
         
         if simd_length(direction) > 0.1 {
-            // 🚨 FIX ROTATION: Rotate to face the direction of movement
+            // Rotate to face direction
             let angle = atan2(direction.x, direction.y)
             self.eulerAngles.y = angle
             
