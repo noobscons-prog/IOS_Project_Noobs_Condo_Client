@@ -1,7 +1,8 @@
 import SwiftUI
+import simd
 
 struct JoystickView: View {
-    var onMove: (simd_float2) -> Void
+    var onMove: (SIMD2<Float>) -> Void
     var onRelease: () -> Void
     
     @State private var offset: CGSize = .zero
@@ -34,7 +35,7 @@ struct JoystickView: View {
                     // Normalize vector (-1 to 1)
                     let normalizedX = Float(offset.width / maxDistance)
                     let normalizedY = Float(offset.height / maxDistance)
-                    onMove(simd_float2(normalizedX, normalizedY))
+                    onMove(SIMD2<Float>(normalizedX, normalizedY))
                 }
                 .onEnded { _ in
                     offset = .zero
