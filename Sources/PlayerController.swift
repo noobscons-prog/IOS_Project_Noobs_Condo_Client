@@ -21,7 +21,6 @@ class PlayerController: SCNNode {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     
     func setupFallbackBody() {
-        // Big red box so we know where the player is
         let geo = SCNBox(width: 2, height: 5, length: 2, chamferRadius: 0)
         let mat = SCNMaterial()
         mat.diffuse.contents = UIColor.red
@@ -32,14 +31,6 @@ class PlayerController: SCNNode {
     }
     
     private func loadCharacterFromUSDZ() {
-        // 1. Print all files in the bundle to debug
-        if let urls = Bundle.main.urls(forResourcesWithExtension: "usdz", subdirectory: nil) {
-            print("FOUND USDZ FILES: \(urls)")
-        } else {
-            print("ERROR: NO USDZ FILES FOUND IN BUNDLE AT ALL.")
-        }
-        
-        // 2. Try to find the file (with and without folder path)
         var url = Bundle.main.url(forResource: "Roblox_R6_Rigged", withExtension: "usdz")
         if url == nil {
             url = Bundle.main.url(forResource: "Roblox_R6_Rigged", withExtension: "usdz", subdirectory: "character_files")
@@ -56,7 +47,6 @@ class PlayerController: SCNNode {
             
             importedRoot.scale = SCNVector3(0.5, 0.5, 0.5) 
             
-            // Remove red fallback box since file loaded successfully
             self.childNodes.forEach { $0.removeFromParentNode() }
             
             self.characterRoot = importedRoot
@@ -135,21 +125,24 @@ class PlayerController: SCNNode {
         rightLeg?.runAction(SCNAction.rotateTo(x: -0.5, y: 0, z: 0, duration: 0.2))
     }
     
-    // MARK: - Controls (Fixed Raycast!)
+    // MARK: - Controls
     func checkGrounded() -> Bool {
-        if let physicsWorld = physicsWorld {
-            let from = presentation.worldPosition
-            let to = SCNVector3(from.x, from.y - 4.0, from.z) // Cast down 4 units
-            // 🚨 FIXED: 'from' is the start, 'to' is the destination.
-            let results = physicsWorld.rayTestWithSegment(from: from, to: to, options: [.searchMode: SCNPhysicsWorld.TestSearchMode.all])
-            return !results.isEmpty
-        }
-        return false
+        // 1. Simple Y-axis check just in case the raycast fails or we are on the baseplate
+        if presentation.position.y <= 3.5 { return true }
+        
+        // 2. Raycast down
+        guard let scene = self.scene else { return false }
+        let physicsWorld = scene.physicsWorld
+        let from = presentation.worldPosition
+        let to = SCNVector3(from.x, from.y - 4.0, from.z)
+        
+        // Fixed options parameter
+        let results = physicsWorld.rayTestWithSegment(from: from, to: to, options: nil)
+        return !results.isEmpty
     }
     
     func jump() {
-        // Allow jumping even if grounded check fails slightly
-        if checkGrounded() || presentation.position.y < 6.0 { 
+        if checkGrounded() { 
             physicsBody?.applyForce(SCNVector3(0, 25, 0), asImpulse: true)
             playJumpPose()
         }
