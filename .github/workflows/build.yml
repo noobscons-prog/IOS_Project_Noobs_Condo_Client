@@ -1,0 +1,95 @@
+name: Build iOS (Unsigned IPA)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: 
+
+env:
+  # 🚨 Change this to match your Godot version if needed
+  GODOT_VERSION: 4.4.1-stable 
+  # The name of your export preset in the Godot editor (see setup notes)
+  IOS_PRESET: iOS
+  # The name of your app (this becomes the .ipa name)
+  APP_NAME: ${{ github.event.repository.name }}
+  # Prevent Homebrew from auto-updating on the macOS runner
+  HOMEBREW_NO_AUTO_UPDATE: 1
+
+jobs:
+  build-ios:
+    runs-on: macos-14 # Apple Silicon runner with Xcode 16
+    timeout-minutes: 60
+
+    steps:
+      # 1. Pull your repository
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          submodules: recursive
+
+      # 2. Compile the C++ GDExtension logic
+      - name: Setup GDExtension Build Environment
+        uses: NodotProject/godot-cpp-builds@v1
+        with:
+          godot-version: ${{ env.GODOT_VERSION }}
+          godot-cpp-path: './godot-cpp'
+
+      - name: Build GDExtension (iOS)
+        run: |
+          # Adjust 'platform=ios' if your scons setup requires a different flag
+          scons platform=ios target=template_release
+
+      # 3. Get headless Godot and export templates
+      - name: Download Godot Headless
+        run: |
+          curl -L \
+            "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_macos.universal.zip" \
+            -o godot.zip
+          unzip -q godot.zip -d godot
+
+      - name: Install iOS Export Template
+        run: |
+          templates_root="$HOME/Library/Application Support/Godot/export_templates"
+          mkdir -p "$templates_root"
+          # Assumes your iOS template is stored in a folder called export_templates/{godot-version}/ios.zip
+          # You need to commit this zip file to your repo (see setup notes)
+          cp -R "export_templates/." "$templates_root/"
+
+      # 4. Export the project to an Xcode project
+      - name: Export to Xcode Project
+        run: |
+          mkdir -p build/ios
+          godot/Godot.app/Contents/MacOS/Godot --headless --path . \
+            --export-release "${IOS_PRESET}" build/ios/${APP_NAME}.xcodeproj
+
+      # 5. Build the unsigned .xcarchive
+      - name: xcodebuild Archive (Unsigned)
+        run: |
+          xcodebuild archive \
+            -project build/ios/${APP_NAME}.xcodeproj \
+            -scheme "${APP_NAME}" \
+            -archivePath build/ios/App.xcarchive \
+            -configuration Release \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO | xcpretty
+
+      # 6. Package the .ipa
+      - name: Package IPA
+        run: |
+          cd build/ios
+          mkdir -p Payload
+          cp -R App.xcarchive/Products/Applications/*.app Payload/
+          zip -r "${APP_NAME}.ipa" Payload
+          mv "${APP_NAME}.ipa" ../../
+
+      # 7. Upload the final .ipa for you to download
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-ipa
+          path: ${{ env.APP_NAME }}.ipa
+          retention-days: 14
