@@ -26,6 +26,7 @@ class PlayerController: SCNNode {
         mat.diffuse.contents = UIColor.red
         geo.materials = [mat]
         let fallbackNode = SCNNode(geometry: geo)
+        // Since physics box center is 0,0,0, we center the visual box at 0,0,0
         fallbackNode.position = SCNVector3(0, 0, 0)
         self.addChildNode(fallbackNode)
     }
@@ -45,13 +46,13 @@ class PlayerController: SCNNode {
             let scene = try SCNScene(url: finalUrl, options: nil)
             guard let importedRoot = scene.rootNode.childNodes.first else { return }
             
-            // 🚨 HARDCODED SCALE 🚨
-            // Since boundingBox is unreliable before rendering, we force a tiny scale.
-            // If this is too small, change 0.05 to 0.1 or 0.2.
+            // Scale down the character
             importedRoot.scale = SCNVector3(0.05, 0.05, 0.05)
             
-            // Center the model inside our physics box
-            importedRoot.position = SCNVector3(0, 0, 0)
+            // 🚨 FIX COLLISION: Align feet to the bottom of the 5-unit physics box (-2.5)
+            let (min, _) = importedRoot.boundingBox
+            let bottomOffset = -min.y * 0.05 // Taking scale into account
+            importedRoot.position = SCNVector3(0, -2.5 + bottomOffset, 0)
             
             self.childNodes.forEach { $0.removeFromParentNode() }
             
@@ -67,38 +68,46 @@ class PlayerController: SCNNode {
         }
     }
     
-    // 🚨 SMARTER LIMB SEARCH 🚨
     private func findR6Parts(in node: SCNNode) {
-        var foundParts = 0
         node.enumerateChildNodes { (child, _) in
             guard let name = child.name?.lowercased() else { return }
             
-            // Using 'contains' so it catches names like "mixamorig:LeftArm" or "Left Arm 1"
-            if name.contains("torso") || name.contains("body") {
+            // Matching common naming conventions (e.g., "LeftArm", "Left Arm", "left_arm")
+            if name.contains("torso") || name.contains("body") || name.contains("chest") {
                 self.torso = child
-                foundParts += 1
             } else if name.contains("head") {
                 self.head = child
-                foundParts += 1
             } else if (name.contains("left") || name.contains("l_")) && name.contains("arm") {
                 self.leftArm = child
-                foundParts += 1
             } else if (name.contains("right") || name.contains("r_")) && name.contains("arm") {
                 self.rightArm = child
-                foundParts += 1
             } else if (name.contains("left") || name.contains("l_")) && name.contains("leg") {
                 self.leftLeg = child
-                foundParts += 1
             } else if (name.contains("right") || name.contains("r_")) && name.contains("leg") {
                 self.rightLeg = child
-                foundParts += 1
             }
         }
-        print("R6 Search Results: Found \(foundParts) parts. Torso:\(torso != nil) Head:\(head != nil) LArm:\(leftArm != nil) RArm:\(rightArm != nil) LLeg:\(leftLeg != nil) RLeg:\(rightLeg != nil)")
+    }
+    
+    // 🚨 DEBUG: Function to get all bone names for the log UI
+    func logBoneNames() -> String {
+        guard let root = characterRoot else { return "No character loaded." }
+        var log = "Character Hierarchy:\n"
+        
+        func traverse(_ node: SCNNode, depth: Int) {
+            let indent = String(repeating: "  ", count: depth)
+            if let name = node.name {
+                log += "\(indent)- \(name)\n"
+            }
+            for child in node.childNodes {
+                traverse(child, depth: depth + 1)
+            }
+        }
+        traverse(root, depth: 0)
+        return log
     }
     
     private func setupLimbPivots() {
-        // Adjusted pivots for the smaller scale
         let armPivot = SCNMatrix4MakeTranslation(0, 1, 0)
         leftArm?.pivot = armPivot
         rightArm?.pivot = armPivot
@@ -114,6 +123,7 @@ class PlayerController: SCNNode {
         physicsBody?.isAffectedByGravity = true
         physicsBody?.angularVelocityFactor = SCNVector3(0, 0, 0)
         physicsBody?.friction = 0.0
+        physicsBody?.restitution = 0.0 // Prevents bouncing
     }
     
     // MARK: - Animations
@@ -150,31 +160,45 @@ class PlayerController: SCNNode {
     
     // MARK: - Controls
     func checkGrounded() -> Bool {
-        if presentation.position.y <= 3.5 { return true }
+        // Since the box is 5 units tall and spawns at Y=2.5, if the player is near Y=2.5, they are on the ground.
+        if presentation.position.y <= 3.0 { return true }
         return false
     }
     
     func jump() {
         if checkGrounded() { 
-            physicsBody?.applyForce(SCNVector3(0, 25, 0), asImpulse: true)
+            // Direct velocity change is much more reliable than force
+            physicsBody?.velocity.y = 15.0
             playJumpPose()
         }
     }
     
     func move(direction: SIMD2<Float>) {
+        // Only move horizontally, preserve gravity's vertical pull
         let speed: Float = 12.0
-        let velocity = SCNVector3(direction.x * speed, physicsBody!.velocity.y, direction.y * speed)
-        physicsBody?.velocity = velocity
+        physicsBody?.velocity.x = direction.x * speed
+        physicsBody?.velocity.z = direction.y * speed
         
         if simd_length(direction) > 0.1 {
-            playWalk()
+            // 🚨 FIX ROTATION: Rotate to face the direction of movement
+            let angle = atan2(direction.x, direction.y)
+            self.eulerAngles.y = angle
+            
+            if checkGrounded() {
+                playWalk()
+            }
         } else {
-            playIdle()
+            if checkGrounded() {
+                playIdle()
+            }
         }
     }
     
     func stop() {
-        physicsBody?.velocity = SCNVector3(0, physicsBody!.velocity.y, 0)
-        playIdle()
+        physicsBody?.velocity.x = 0
+        physicsBody?.velocity.z = 0
+        if checkGrounded() {
+            playIdle()
+        }
     }
 }
