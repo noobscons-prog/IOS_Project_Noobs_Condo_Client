@@ -42,9 +42,14 @@ jobs:
       - name: Download Game Assets
         run: |
           mkdir -p character_files textures
+          
+          # Download R6 Character and textures
           curl -L "https://github.com/noobscons-prog/IOS_CONDO_BLOX/raw/refs/heads/main/character_files/r6_default_character.fbx" -o character_files/r6_default_character.fbx
           curl -L "https://github.com/noobscons-prog/IOS_CONDO_BLOX/raw/refs/heads/main/character_textures/face_texture.png" -o character_files/Head1_diff.png
           curl -L "https://github.com/noobscons-prog/IOS_CONDO_BLOX/raw/refs/heads/main/textures/stud_texture.jpeg" -o textures/stud_texture.jpeg
+          
+          # Download App Icon (Make sure this is 1024x1024!)
+          curl -L "https://github.com/noobscons-prog/IOS_Project_Noobs_Condo_Client/raw/main/appicon.png" -o appicon.png
 
       - name: Build godot-cpp (iOS)
         run: |
@@ -61,7 +66,6 @@ jobs:
           curl -L "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_macos.universal.zip" -o godot.zip
           unzip -q godot.zip -d godot
 
-      # 🚨 NEW: Download and install the iOS Export Templates
       - name: Install Export Templates
         run: |
           TEMPLATE_DIR="$HOME/Library/Application Support/Godot/export_templates/4.4.1.stable"
