@@ -1,4 +1,5 @@
 import SceneKit
+import simd
 
 class PlayerController: SCNNode {
     var torso = SCNNode()
@@ -9,7 +10,6 @@ class PlayerController: SCNNode {
     var rightLeg = SCNNode()
     
     var isGrounded = false
-    var jumpAction: SCNAction?
     
     override init() {
         super.init()
@@ -24,11 +24,10 @@ class PlayerController: SCNNode {
         let blockMaterial = SCNMaterial()
         blockMaterial.diffuse.contents = UIColor.systemBlue
         
-        // Dimensions matching Roblox R6
         let torsoGeo = SCNBox(width: 2, height: 2, length: 1, chamferRadius: 0)
         torsoGeo.materials = [blockMaterial]
         torso.geometry = torsoGeo
-        torso.position = SCNVector3(0, 2, 0) // Center of body
+        torso.position = SCNVector3(0, 2, 0)
         addChildNode(torso)
         
         let headGeo = SCNBox(width: 1.2, height: 1.2, length: 1.2, chamferRadius: 0)
@@ -36,7 +35,7 @@ class PlayerController: SCNNode {
         headMat.diffuse.contents = UIColor.systemYellow
         headGeo.materials = [headMat]
         head.geometry = headGeo
-        head.position = SCNVector3(0, 1.6, 0) // Relative to torso
+        head.position = SCNVector3(0, 1.6, 0)
         torso.addChildNode(head)
         
         let limbGeo = SCNBox(width: 1, height: 2, length: 1, chamferRadius: 0)
@@ -44,7 +43,6 @@ class PlayerController: SCNNode {
         limbMat.diffuse.contents = UIColor.systemYellow
         limbGeo.materials = [limbMat]
         
-        // Arms (Pivot at top shoulder)
         leftArm.geometry = limbGeo
         leftArm.pivot = SCNMatrix4MakeTranslation(0, -1, 0) 
         leftArm.position = SCNVector3(-1.5, 1, 0)
@@ -55,7 +53,6 @@ class PlayerController: SCNNode {
         rightArm.position = SCNVector3(1.5, 1, 0)
         torso.addChildNode(rightArm)
         
-        // Legs (Pivot at top hip)
         leftLeg.geometry = limbGeo
         leftLeg.pivot = SCNMatrix4MakeTranslation(0, 1, 0)
         leftLeg.position = SCNVector3(-0.5, -1, 0)
@@ -71,8 +68,7 @@ class PlayerController: SCNNode {
         let shape = SCNPhysicsShape(geometry: SCNBox(width: 2, height: 5, length: 1, chamferRadius: 0), options: nil)
         physicsBody = SCNPhysicsBody(type: .dynamic, shape: shape)
         physicsBody?.isAffectedByGravity = true
-        physicsBody?.allowsRotation = false 
-        physicsBody?.angularVelocityFactor = SCNVector3(0, 0, 0)
+        physicsBody?.angularVelocityFactor = SCNVector3(0, 0, 0) // This locks rotation
     }
     
     // MARK: - Animations
@@ -80,14 +76,12 @@ class PlayerController: SCNNode {
         removeAction(forKey: "walk")
         removeAction(forKey: "idle")
         
-        // Reset limbs
         let reset = SCNAction.rotateTo(x: 0, y: 0, z: 0, duration: 0.2)
         leftArm.runAction(reset)
         rightArm.runAction(reset)
         leftLeg.runAction(reset)
         rightLeg.runAction(reset)
         
-        // Breathing animation
         let breatheUp = SCNAction.moveBy(x: 0, y: 0.05, z: 0, duration: 1.0)
         let breatheDown = breatheUp.reversed()
         let breathe = SCNAction.sequence([breatheUp, breatheDown])
@@ -117,17 +111,15 @@ class PlayerController: SCNNode {
             removeAction(forKey: "walk")
             removeAction(forKey: "idle")
             
-            // Jump pose
             leftArm.runAction(SCNAction.rotateTo(x: 0, y: 0, z: -2.5, duration: 0.2))
             rightArm.runAction(SCNAction.rotateTo(x: 0, y: 0, z: 2.5, duration: 0.2))
         }
     }
     
-    func move(direction: simd_float2) {
+    func move(direction: SIMD2<Float>) {
         if !isGrounded { return }
         
         let speed: Float = 12.0
-        // Invert Y for SceneKit's -Z forward axis
         let velocity = SCNVector3(direction.x * speed, physicsBody!.velocity.y, direction.y * speed)
         physicsBody?.velocity = velocity
         
