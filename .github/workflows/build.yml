@@ -20,7 +20,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 🚨 FIXED: Use Homebrew to install SCons
       - name: Install SCons
         run: |
           brew install scons
@@ -30,6 +29,17 @@ jobs:
           git clone https://github.com/godotengine/godot-cpp.git
           cd godot-cpp
           git checkout godot-4.4-stable
+
+      # 🚨 NEW: This saves the compiled engine so you don't rebuild it!
+      - name: Cache godot-cpp compiled files
+        uses: actions/cache@v4
+        with:
+          path: |
+            godot-cpp/bin
+            .sconsign.dblite
+          key: ${{ runner.os }}-godot-cpp-${{ env.GODOT_VERSION }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-godot-cpp-${{ env.GODOT_VERSION }}-
 
       - name: Download Game Assets
         run: |
