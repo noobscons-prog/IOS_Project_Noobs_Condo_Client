@@ -20,10 +20,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 🚨 NEW: Install the scons build tool
+      # 🚨 FIXED: Use Homebrew to install SCons
       - name: Install SCons
         run: |
-          python3 -m pip install scons
+          brew install scons
 
       - name: Setup godot-cpp
         run: |
@@ -37,7 +37,6 @@ jobs:
           curl -L "https://github.com/noobscons-prog/IOS_CONDO_BLOX/raw/refs/heads/main/character_files/r6_default_character.fbx" -o character_files/r6_default_character.fbx
           curl -L "https://github.com/noobscons-prog/IOS_CONDO_BLOX/raw/refs/heads/main/textures/stud_texture.jpeg" -o textures/stud_texture.jpeg
 
-      # 🚨 NEW: Build the godot-cpp static library first
       - name: Build godot-cpp (iOS)
         run: |
           cd godot-cpp
@@ -46,7 +45,6 @@ jobs:
 
       - name: Build GDExtension (iOS)
         run: |
-          # Added arch=arm64 to match iOS devices
           scons platform=ios target=template_release arch=arm64
 
       - name: Download Godot Headless
