@@ -7,7 +7,9 @@ targets:
   IOS_CONDO_BLOX:
     type: application
     platform: iOS
-    sources: [Sources]
+    sources:
+      - Sources
+      - character_files
     settings:
       base:
         INFOPLIST_FILE: Sources/Info.plist
