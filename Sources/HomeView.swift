@@ -20,7 +20,7 @@ struct HomeView: View {
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
-                        // Friends Section
+                        // Friends Section (Placeholder)
                         Text("Friends (0)").font(.headline).foregroundColor(.white).padding(.horizontal)
                         
                         // Recommended Section
