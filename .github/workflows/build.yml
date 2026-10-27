@@ -13,45 +13,40 @@ env:
 
 jobs:
   build-ios:
-    runs-on: macos-14 
+    # 🚨 CHANGED: Use a current, supported runner label
+    runs-on: macos-latest 
     timeout-minutes: 60
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 1. Download godot-cpp automatically
       - name: Setup godot-cpp
         run: |
           git clone https://github.com/godotengine/godot-cpp.git
           cd godot-cpp
           git checkout godot-4.4-stable
 
-      # 2. Download your specific assets from your other repo!
       - name: Download Game Assets
         run: |
           mkdir -p character_files textures
           curl -L "https://github.com/noobscons-prog/IOS_CONDO_BLOX/raw/refs/heads/main/character_files/r6_default_character.fbx" -o character_files/r6_default_character.fbx
           curl -L "https://github.com/noobscons-prog/IOS_CONDO_BLOX/raw/refs/heads/main/textures/stud_texture.jpeg" -o textures/stud_texture.jpeg
 
-      # 3. Compile C++ GDExtension
       - name: Build GDExtension (iOS)
         run: |
           scons platform=ios target=template_release
 
-      # 4. Get headless Godot & Export Templates
       - name: Download Godot Headless
         run: |
           curl -L "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_macos.universal.zip" -o godot.zip
           unzip -q godot.zip -d godot
 
-      # 5. Export to Xcode Project
       - name: Export to Xcode Project
         run: |
           mkdir -p build/ios
           godot/Godot.app/Contents/MacOS/Godot --headless --path . --export-release "${IOS_PRESET}" build/ios/${APP_NAME}.xcodeproj
 
-      # 6. Build the unsigned .ipa
       - name: xcodebuild Archive (Unsigned)
         run: |
           xcodebuild archive \
