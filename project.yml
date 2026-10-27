@@ -8,8 +8,10 @@ targets:
     type: application
     platform: iOS
     sources:
-      - Sources
-      - character_files
+      - path: Sources
+      # 🚨 This line forces Xcode to include the USDZ file in the IPA
+      - path: character_files
+        buildPhase: resources
     settings:
       base:
         INFOPLIST_FILE: Sources/Info.plist
