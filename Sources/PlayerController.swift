@@ -23,7 +23,7 @@ class PlayerController: SCNNode {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     
     private func loadCharacter() {
-        // 🚨 PRIORITIZE FBX 🚨
+        // Prioritize FBX
         var url = Bundle.main.url(forResource: "Roblox_R6_Rigged", withExtension: "fbx")
         if url == nil {
             url = Bundle.main.url(forResource: "Roblox_R6_Rigged", withExtension: "usdz")
@@ -37,14 +37,15 @@ class PlayerController: SCNNode {
         do {
             // Use SCNSceneSource to load FBX properly
             let source = SCNSceneSource(url: finalUrl, options: nil)
-            let scene = source?.scene(options: nil, error: nil)
+            // 🚨 FIXED: Use try? instead of the error parameter
+            let scene = try? source?.scene(options: nil)
             
             guard let rootNode = scene?.rootNode.childNodes.first else {
                 boneLogText = "ERROR: Failed to extract root node from file."
                 return
             }
             
-            // 🚨 HARDCODED SCALE 🚨
+            // Hardcoded scale down
             rootNode.scale = SCNVector3(0.1, 0.1, 0.1)
             
             // Align feet to the bottom of the physics box (-2.5)
@@ -68,7 +69,9 @@ class PlayerController: SCNNode {
     }
     
     private func findR6PartsAndLog(in node: SCNNode) {
-        var depth = 0
+        // 🚨 FIXED: Changed var to let to remove the warning
+        let depth = 0
+        
         // Recursive function to print and find parts
         func traverse(currentNode: SCNNode, currentDepth: Int) {
             let indent = String(repeating: "  ", count: currentDepth)
@@ -93,7 +96,6 @@ class PlayerController: SCNNode {
     }
     
     private func setupLimbPivots() {
-        // Pivot adjustments for the smaller scale
         let armPivot = SCNMatrix4MakeTranslation(0, 1, 0)
         leftArm?.pivot = armPivot
         rightArm?.pivot = armPivot
@@ -104,12 +106,11 @@ class PlayerController: SCNNode {
     }
     
     private func setupPhysics() {
-        // 5-unit tall physics box, centered at (0,0,0) of the player node
         let shape = SCNPhysicsShape(geometry: SCNBox(width: 2, height: 5, length: 2, chamferRadius: 0), options: nil)
         physicsBody = SCNPhysicsBody(type: .dynamic, shape: shape)
         physicsBody?.isAffectedByGravity = true
         physicsBody?.angularVelocityFactor = SCNVector3(0, 0, 0)
-        physicsBody?.friction = 0.5 // Increased friction so we don't slide
+        physicsBody?.friction = 0.5 
         physicsBody?.restitution = 0.0 
     }
     
@@ -147,7 +148,6 @@ class PlayerController: SCNNode {
     
     // MARK: - Controls
     func checkGrounded() -> Bool {
-        // Ground top is at Y=0. Box center is Y=2.5. If center is below 3.0, we are grounded.
         if presentation.position.y <= 3.0 { return true }
         return false
     }
@@ -161,12 +161,10 @@ class PlayerController: SCNNode {
     
     func move(direction: SIMD2<Float>) {
         let speed: Float = 12.0
-        // Only change X and Z. Y is handled by gravity.
         physicsBody?.velocity.x = direction.x * speed
         physicsBody?.velocity.z = direction.y * speed
         
         if simd_length(direction) > 0.1 {
-            // Rotate to face direction
             let angle = atan2(direction.x, direction.y)
             self.eulerAngles.y = angle
             
