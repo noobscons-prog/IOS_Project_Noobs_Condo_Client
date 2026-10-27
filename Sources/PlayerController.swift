@@ -112,13 +112,13 @@ class PlayerController: SCNNode {
     func playIdle() {
         // Reset to neutral
         let reset = SCNAction.rotateTo(x: 0, y: 0, z: 0, duration: 0.2)
-        [leftArm, rightArm, leftLeg, rightLeg].forEach { $0?.run(reset) }
+        [leftArm, rightArm, leftLeg, rightLeg].forEach { $0?.runAction(reset) }
         
         // Simple breathing on torso
         let breatheUp = SCNAction.moveBy(x: 0, y: 0.05, z: 0, duration: 1.0)
         let breatheDown = breatheUp.reversed()
         let breathe = SCNAction.sequence([breatheUp, breatheDown])
-        torso?.run(SCNAction.repeatForever(breathe), forKey: "idle")
+        torso?.runAction(SCNAction.repeatForever(breathe), forKey: "idle")
     }
     
     private func playWalk() {
@@ -130,20 +130,20 @@ class PlayerController: SCNNode {
         let walkCycle = SCNAction.sequence([swingForward, swingBack])
         
         // Legs swing opposite
-        leftLeg?.run(SCNAction.repeatForever(walkCycle), forKey: "walk")
-        rightLeg?.run(SCNAction.repeatForever(walkCycle.reversed()), forKey: "walk")
+        leftLeg?.runAction(SCNAction.repeatForever(walkCycle), forKey: "walk")
+        rightLeg?.runAction(SCNAction.repeatForever(walkCycle.reversed()), forKey: "walk")
         
         // Arms swing opposite to legs
-        leftArm?.run(SCNAction.repeatForever(walkCycle.reversed()), forKey: "walk")
-        rightArm?.run(SCNAction.repeatForever(walkCycle), forKey: "walk")
+        leftArm?.runAction(SCNAction.repeatForever(walkCycle.reversed()), forKey: "walk")
+        rightArm?.runAction(SCNAction.repeatForever(walkCycle), forKey: "walk")
     }
     
     private func playJumpPose() {
         // Quick pose for jumping
-        leftArm?.run(SCNAction.rotateTo(x: 0, y: 0, z: -2.0, duration: 0.2))
-        rightArm?.run(SCNAction.rotateTo(x: 0, y: 0, z: 2.0, duration: 0.2))
-        leftLeg?.run(SCNAction.rotateTo(x: -0.5, y: 0, z: 0, duration: 0.2))
-        rightLeg?.run(SCNAction.rotateTo(x: -0.5, y: 0, z: 0, duration: 0.2))
+        leftArm?.runAction(SCNAction.rotateTo(x: 0, y: 0, z: -2.0, duration: 0.2))
+        rightArm?.runAction(SCNAction.rotateTo(x: 0, y: 0, z: 2.0, duration: 0.2))
+        leftLeg?.runAction(SCNAction.rotateTo(x: -0.5, y: 0, z: 0, duration: 0.2))
+        rightLeg?.runAction(SCNAction.rotateTo(x: -0.5, y: 0, z: 0, duration: 0.2))
     }
     
     // MARK: - Controls
