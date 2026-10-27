@@ -21,7 +21,6 @@ class PlayerController: SCNNode {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     
     func setupFallbackBody() {
-        // We keep this invisible just in case, but remove it if USDZ loads
         let geo = SCNBox(width: 2, height: 5, length: 2, chamferRadius: 0)
         let mat = SCNMaterial()
         mat.diffuse.contents = UIColor.red
@@ -46,21 +45,14 @@ class PlayerController: SCNNode {
             let scene = try SCNScene(url: finalUrl, options: nil)
             guard let importedRoot = scene.rootNode.childNodes.first else { return }
             
-            // 🚨 DYNAMIC SCALING 🚨
-            // Calculate how big the model currently is
-            let (min, max) = importedRoot.boundingBox
-            let currentHeight = max.y - min.y
+            // 🚨 HARDCODED SCALE 🚨
+            // Since boundingBox is unreliable before rendering, we force a tiny scale.
+            // If this is too small, change 0.05 to 0.1 or 0.2.
+            importedRoot.scale = SCNVector3(0.05, 0.05, 0.05)
             
-            // We want the character to be exactly 5 units tall (standard Roblox height)
-            let targetHeight: Float = 5.0
-            let scaleFactor = targetHeight / currentHeight
-            importedRoot.scale = SCNVector3(scaleFactor, scaleFactor, scaleFactor)
+            // Center the model inside our physics box
+            importedRoot.position = SCNVector3(0, 0, 0)
             
-            // Shift the model so its feet are at the bottom of the physics box (-2.5)
-            let bottomOffset = -min.y * scaleFactor
-            importedRoot.position = SCNVector3(0, -2.5 + bottomOffset, 0)
-            
-            // Remove fallback box
             self.childNodes.forEach { $0.removeFromParentNode() }
             
             self.characterRoot = importedRoot
@@ -75,22 +67,38 @@ class PlayerController: SCNNode {
         }
     }
     
+    // 🚨 SMARTER LIMB SEARCH 🚨
     private func findR6Parts(in node: SCNNode) {
+        var foundParts = 0
         node.enumerateChildNodes { (child, _) in
-            switch child.name?.lowercased() {
-            case "torso": self.torso = child
-            case "head": self.head = child
-            case "left arm", "leftarm": self.leftArm = child
-            case "right arm", "rightarm": self.rightArm = child
-            case "left leg", "leftleg": self.leftLeg = child
-            case "right leg", "rightleg": self.rightLeg = child
-            default: break
+            guard let name = child.name?.lowercased() else { return }
+            
+            // Using 'contains' so it catches names like "mixamorig:LeftArm" or "Left Arm 1"
+            if name.contains("torso") || name.contains("body") {
+                self.torso = child
+                foundParts += 1
+            } else if name.contains("head") {
+                self.head = child
+                foundParts += 1
+            } else if (name.contains("left") || name.contains("l_")) && name.contains("arm") {
+                self.leftArm = child
+                foundParts += 1
+            } else if (name.contains("right") || name.contains("r_")) && name.contains("arm") {
+                self.rightArm = child
+                foundParts += 1
+            } else if (name.contains("left") || name.contains("l_")) && name.contains("leg") {
+                self.leftLeg = child
+                foundParts += 1
+            } else if (name.contains("right") || name.contains("r_")) && name.contains("leg") {
+                self.rightLeg = child
+                foundParts += 1
             }
         }
+        print("R6 Search Results: Found \(foundParts) parts. Torso:\(torso != nil) Head:\(head != nil) LArm:\(leftArm != nil) RArm:\(rightArm != nil) LLeg:\(leftLeg != nil) RLeg:\(rightLeg != nil)")
     }
     
     private func setupLimbPivots() {
-        // Since the model is dynamically scaled, we need to adjust pivots relative to the new scale
+        // Adjusted pivots for the smaller scale
         let armPivot = SCNMatrix4MakeTranslation(0, 1, 0)
         leftArm?.pivot = armPivot
         rightArm?.pivot = armPivot
@@ -101,7 +109,6 @@ class PlayerController: SCNNode {
     }
     
     private func setupPhysics() {
-        // The physics box is exactly 5 units tall, centered at 0,0,0
         let shape = SCNPhysicsShape(geometry: SCNBox(width: 2, height: 5, length: 2, chamferRadius: 0), options: nil)
         physicsBody = SCNPhysicsBody(type: .dynamic, shape: shape)
         physicsBody?.isAffectedByGravity = true
@@ -143,7 +150,6 @@ class PlayerController: SCNNode {
     
     // MARK: - Controls
     func checkGrounded() -> Bool {
-        // We check if the center of the body is near the floor (since the body is 5 units tall, center is at 2.5)
         if presentation.position.y <= 3.5 { return true }
         return false
     }
