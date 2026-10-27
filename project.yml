@@ -1,0 +1,14 @@
+name: IOS_CONDO_BLOX
+options:
+  bundleIdPrefix: com.noobscons
+  deploymentTarget:
+    iOS: "15.0"
+targets:
+  IOS_CONDO_BLOX:
+    type: application
+    platform: iOS
+    sources: [Sources]
+    settings:
+      base:
+        INFOPLIST_FILE: Sources/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.noobscons.robloxclone
