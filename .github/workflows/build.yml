@@ -39,7 +39,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-godot-cpp-${{ env.GODOT_VERSION }}-
 
-      # 🚨 FIXED: Download the texture and rename it so the FBX can find it
       - name: Download Game Assets
         run: |
           mkdir -p character_files textures
@@ -61,6 +60,15 @@ jobs:
         run: |
           curl -L "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_macos.universal.zip" -o godot.zip
           unzip -q godot.zip -d godot
+
+      # 🚨 NEW: Download and install the iOS Export Templates
+      - name: Install Export Templates
+        run: |
+          TEMPLATE_DIR="$HOME/Library/Application Support/Godot/export_templates/4.4.1.stable"
+          mkdir -p "$TEMPLATE_DIR"
+          curl -L "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_export_templates.tpz" -o templates.tpz
+          unzip -q templates.tpz -d templates
+          cp templates/templates/ios.zip "$TEMPLATE_DIR/ios.zip"
 
       - name: Export to Xcode Project
         run: |
