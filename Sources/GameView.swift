@@ -8,16 +8,13 @@ struct GameView: View {
     @State private var cameraNode = SCNNode()
     @State private var player = PlayerController()
     
-    // 🚨 DEBUG LOG STATES
     @State private var showLogs = false
-    @State private var logText = ""
     
     var body: some View {
         ZStack {
             SceneView(scene: scene, pointOfView: cameraNode, options: [.autoenablesDefaultLighting])
                 .ignoresSafeArea()
             
-            // UI Overlay
             VStack {
                 HStack {
                     Button(action: { showGame = false }) {
@@ -32,9 +29,8 @@ struct GameView: View {
                     
                     Spacer()
                     
-                    // 🚨 DEBUG BUTTON
+                    // 🚨 LOG BUTTON 🚨
                     Button(action: {
-                        logText = player.logBoneNames()
                         showLogs = true
                     }) {
                         Text("Logs")
@@ -79,24 +75,28 @@ struct GameView: View {
                 Text("Bone Hierarchy")
                     .font(.title)
                     .padding()
-                ScrollView {
-                    Text(logText)
-                        .font(.system(.body, design: .monospaced))
-                        .padding()
-                }
+                
+                // 🚨 TEXT EDITOR 🚨 Guaranteed to show text
+                TextEditor(text: .constant(player.boneLogText))
+                    .font(.system(.body, design: .monospaced))
+                    .foregroundColor(.green)
+                    .background(Color.black)
+                    .padding()
+                
                 Button("Close") { showLogs = false }
                     .padding()
             }
+            .background(Color.black)
         }
     }
     
     func setupScene() {
         scene.background.contents = UIColor(red: 0.4, green: 0.6, blue: 0.8, alpha: 1.0)
         
-        // Baseplate
-        let baseplateGeo = SCNBox(width: 200, height: 5, length: 200, chamferRadius: 0)
+        // Baseplate (1 unit thick, top is at y=0)
+        let baseplateGeo = SCNBox(width: 200, height: 1, length: 200, chamferRadius: 0)
         let baseplateNode = SCNNode(geometry: baseplateGeo)
-        baseplateNode.position = SCNVector3(0, -2.5, 0) 
+        baseplateNode.position = SCNVector3(0, -0.5, 0) 
         
         let material = SCNMaterial()
         material.diffuse.contents = UIColor.darkGray
@@ -106,7 +106,7 @@ struct GameView: View {
         baseplateNode.physicsBody = SCNPhysicsBody(type: .static, shape: physicsShape)
         scene.rootNode.addChildNode(baseplateNode)
         
-        // Player (Spawns at Y=2.5 so feet touch the floor)
+        // Player spawns at Y=2.5 so its feet perfectly rest on the ground (Y=0)
         player.position = SCNVector3(0, 2.5, 0)
         scene.rootNode.addChildNode(player)
         
