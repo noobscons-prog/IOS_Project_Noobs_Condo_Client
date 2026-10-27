@@ -21,8 +21,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install SCons
-        run: |
-          brew install scons
+        run: brew install scons
 
       - name: Setup godot-cpp
         run: |
@@ -30,7 +29,6 @@ jobs:
           cd godot-cpp
           git checkout godot-4.4-stable
 
-      # 🚨 NEW: This saves the compiled engine so you don't rebuild it!
       - name: Cache godot-cpp compiled files
         uses: actions/cache@v4
         with:
@@ -41,10 +39,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-godot-cpp-${{ env.GODOT_VERSION }}-
 
+      # 🚨 FIXED: Download the texture and rename it so the FBX can find it
       - name: Download Game Assets
         run: |
           mkdir -p character_files textures
           curl -L "https://github.com/noobscons-prog/IOS_CONDO_BLOX/raw/refs/heads/main/character_files/r6_default_character.fbx" -o character_files/r6_default_character.fbx
+          curl -L "https://github.com/noobscons-prog/IOS_CONDO_BLOX/raw/refs/heads/main/character_textures/face_texture.png" -o character_files/Head1_diff.png
           curl -L "https://github.com/noobscons-prog/IOS_CONDO_BLOX/raw/refs/heads/main/textures/stud_texture.jpeg" -o textures/stud_texture.jpeg
 
       - name: Build godot-cpp (iOS)
