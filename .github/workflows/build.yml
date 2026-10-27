@@ -13,13 +13,17 @@ env:
 
 jobs:
   build-ios:
-    # 🚨 CHANGED: Use a current, supported runner label
     runs-on: macos-latest 
     timeout-minutes: 60
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # 🚨 NEW: Install the scons build tool
+      - name: Install SCons
+        run: |
+          python3 -m pip install scons
 
       - name: Setup godot-cpp
         run: |
@@ -33,9 +37,17 @@ jobs:
           curl -L "https://github.com/noobscons-prog/IOS_CONDO_BLOX/raw/refs/heads/main/character_files/r6_default_character.fbx" -o character_files/r6_default_character.fbx
           curl -L "https://github.com/noobscons-prog/IOS_CONDO_BLOX/raw/refs/heads/main/textures/stud_texture.jpeg" -o textures/stud_texture.jpeg
 
+      # 🚨 NEW: Build the godot-cpp static library first
+      - name: Build godot-cpp (iOS)
+        run: |
+          cd godot-cpp
+          scons platform=ios target=template_release arch=arm64
+          cd ..
+
       - name: Build GDExtension (iOS)
         run: |
-          scons platform=ios target=template_release
+          # Added arch=arm64 to match iOS devices
+          scons platform=ios target=template_release arch=arm64
 
       - name: Download Godot Headless
         run: |
