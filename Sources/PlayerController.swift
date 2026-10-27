@@ -125,20 +125,14 @@ class PlayerController: SCNNode {
         rightLeg?.runAction(SCNAction.rotateTo(x: -0.5, y: 0, z: 0, duration: 0.2))
     }
     
-    // MARK: - Controls
+    // MARK: - Controls (Fixed Ground Check)
     func checkGrounded() -> Bool {
-        // 1. Simple Y-axis check just in case the raycast fails or we are on the baseplate
-        if presentation.position.y <= 3.5 { return true }
-        
-        // 2. Raycast down
-        guard let scene = self.scene else { return false }
-        let physicsWorld = scene.physicsWorld
-        let from = presentation.worldPosition
-        let to = SCNVector3(from.x, from.y - 4.0, from.z)
-        
-        // Fixed options parameter
-        let results = physicsWorld.rayTestWithSegment(from: from, to: to, options: nil)
-        return !results.isEmpty
+        // Simple, reliable check for our baseplate setup.
+        // If the player's Y position is near the floor, they are grounded.
+        if presentation.position.y <= 3.5 { 
+            return true 
+        }
+        return false
     }
     
     func jump() {
