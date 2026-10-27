@@ -8,6 +8,10 @@ struct GameView: View {
     @State private var cameraNode = SCNNode()
     @State private var player = PlayerController()
     
+    // 🚨 DEBUG LOG STATES
+    @State private var showLogs = false
+    @State private var logText = ""
+    
     var body: some View {
         ZStack {
             SceneView(scene: scene, pointOfView: cameraNode, options: [.autoenablesDefaultLighting])
@@ -25,7 +29,22 @@ struct GameView: View {
                             .foregroundColor(.white)
                             .cornerRadius(10)
                     }
+                    
                     Spacer()
+                    
+                    // 🚨 DEBUG BUTTON
+                    Button(action: {
+                        logText = player.logBoneNames()
+                        showLogs = true
+                    }) {
+                        Text("Logs")
+                            .font(.headline)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(Color.black.opacity(0.6))
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                    }
                 }
                 .padding()
                 
@@ -55,6 +74,20 @@ struct GameView: View {
         .onAppear {
             setupScene()
         }
+        .sheet(isPresented: $showLogs) {
+            VStack {
+                Text("Bone Hierarchy")
+                    .font(.title)
+                    .padding()
+                ScrollView {
+                    Text(logText)
+                        .font(.system(.body, design: .monospaced))
+                        .padding()
+                }
+                Button("Close") { showLogs = false }
+                    .padding()
+            }
+        }
     }
     
     func setupScene() {
@@ -73,8 +106,8 @@ struct GameView: View {
         baseplateNode.physicsBody = SCNPhysicsBody(type: .static, shape: physicsShape)
         scene.rootNode.addChildNode(baseplateNode)
         
-        // Player (Spawn above ground)
-        player.position = SCNVector3(0, 5, 0)
+        // Player (Spawns at Y=2.5 so feet touch the floor)
+        player.position = SCNVector3(0, 2.5, 0)
         scene.rootNode.addChildNode(player)
         
         // Camera
@@ -82,13 +115,11 @@ struct GameView: View {
         cameraNode.position = SCNVector3(0, 10, 15) 
         scene.rootNode.addChildNode(cameraNode)
         
-        // Follow Camera (Tuned for a 5-unit character)
+        // Follow Camera
         let followAction = SCNAction.customAction(duration: .infinity) { _, _ in
             let playerPos = self.player.presentation.position
-            // Camera stays 8 units up and 12 units back
             let targetPos = SCNVector3(playerPos.x, playerPos.y + 6, playerPos.z + 12)
             self.cameraNode.position = targetPos
-            // Look slightly above the center of the player
             self.cameraNode.look(at: SCNVector3(playerPos.x, playerPos.y + 1, playerPos.z))
         }
         cameraNode.runAction(followAction)
